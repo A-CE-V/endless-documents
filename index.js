@@ -8,31 +8,35 @@ import axios from "axios";
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Ensure uploads directory exists (important for Docker)
+// Ensure uploads directory exists
 if (!fs.existsSync("uploads")) fs.mkdirSync("uploads");
 
-// Multer setup for file uploads
+// Multer setup
 const upload = multer({ dest: "uploads/" });
 
 // Middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Wrap libre.convert into a Promise
+// Wrap libre.convert into a Promise and explicitly set soffice path
 const convertLibre = (inputFile, ext) =>
   new Promise((resolve, reject) => {
-    libre.convert(inputFile, ext, undefined, (err, done) => {
-      if (err) return reject(err);
-      resolve(done);
-    });
+    libre.convert(
+      inputFile,
+      ext,
+      { libreOfficePath: "/usr/bin/soffice" },
+      (err, done) => {
+        if (err) return reject(err);
+        resolve(done);
+      }
+    );
   });
 
-// 🚀 Universal file conversion endpoint
+// Universal file conversion endpoint
 app.post("/convert", upload.single("file"), async (req, res) => {
   try {
     const { format, url } = req.body;
 
-    // Validate parameters
     if (!format) {
       return res.status(400).json({
         title: "Missing format",
@@ -51,21 +55,16 @@ app.post("/convert", upload.single("file"), async (req, res) => {
 
     let inputFile;
     let filename = "converted";
-    let inputExt;
 
     if (req.file) {
-      // Read the uploaded file
       inputFile = fs.readFileSync(req.file.path);
       filename = path.parse(req.file.originalname).name;
-      inputExt = path.extname(req.file.originalname).slice(1);
-      fs.unlinkSync(req.file.path); // Clean up after reading
+      fs.unlinkSync(req.file.path);
     } else if (url) {
-      // Fetch file from URL
       try {
         const response = await axios.get(url, { responseType: "arraybuffer" });
         inputFile = Buffer.from(response.data);
         filename = path.basename(url, path.extname(url));
-        inputExt = path.extname(url).slice(1);
       } catch {
         return res.status(400).json({
           title: "Invalid URL",
@@ -76,14 +75,9 @@ app.post("/convert", upload.single("file"), async (req, res) => {
     }
 
     const targetExt = `.${format.toLowerCase()}`;
-
-    // Run LibreOffice conversion
     const converted = await convertLibre(inputFile, targetExt);
 
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${filename}${targetExt}"`
-    );
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}${targetExt}"`);
     res.setHeader("Content-Type", "application/octet-stream");
     res.send(converted);
   } catch (err) {
@@ -96,7 +90,7 @@ app.post("/convert", upload.single("file"), async (req, res) => {
   }
 });
 
-// 🩺 Health check
+// Health check
 app.get("/health", (req, res) => {
   res.json({ status: "OK", uptime: process.uptime() });
 });
