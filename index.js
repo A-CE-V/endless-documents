@@ -19,9 +19,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Wrap libre.convert into a Promise and explicitly set soffice path
+// Wrap libre.convert into a Promise
 const convertLibre = (inputFile, ext) =>
   new Promise((resolve, reject) => {
-    libre.convert(inputFile, ext, { libreOfficePath: "/usr/bin/soffice" }, (err, done) => {
+    // Remove the third argument { libreOfficePath: "/usr/bin/soffice" }
+    libre.convert(inputFile, ext, (err, done) => {
       if (err) return reject(err);
       resolve(done);
     });
