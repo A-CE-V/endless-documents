@@ -19,6 +19,9 @@ RUN apt-get update && \
       unoconv \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Symlink soffice so libreoffice-convert can find it
+RUN ln -s /usr/lib/libreoffice/program/soffice /usr/bin/soffice || true
+
 # App setup
 WORKDIR /app
 COPY package*.json ./
