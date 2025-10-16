@@ -3,7 +3,9 @@ import tempfile
 import urllib.request
 import subprocess
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.requests import Request
+
 
 app = FastAPI()
 
@@ -15,7 +17,7 @@ PANDOC_FORMATS = [
 
 # Map common file extensions to Pandoc input formats
 EXT_TO_PANDOC = {
-    "txt": "plain",
+    "txt": "markdown",         # ← was "plain", now fixed
     "md": "markdown",
     "markdown": "markdown",
     "html": "html",
@@ -24,7 +26,7 @@ EXT_TO_PANDOC = {
     "odt": "odt",
     "rtf": "rtf",
     "tex": "latex",
-    "csv": "csv",
+    "csv": "markdown",         # CSV might be handled as a table in markdown
     "epub": "epub",
     "asciidoc": "asciidoc",
     "mediawiki": "mediawiki"
@@ -40,15 +42,16 @@ def home():
     }
 
 
+@app.head("/health")
 @app.get("/health")
-def health():
-    return {
+def health(request: Request):
+    return JSONResponse({
         "status": "OK",
         "uptime": os.times(),
         "supported": {
             "pandoc": True
         }
-    }
+    })
 
 
 @app.get("/formats")
