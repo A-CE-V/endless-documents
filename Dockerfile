@@ -1,14 +1,17 @@
 FROM python:3.11-bullseye
 
-# Install LibreOffice, Pandoc, and extra fonts
+# Install system dependencies: LibreOffice, Pandoc, LaTeX, fonts, unoconv
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends apt-utils && \
-    apt-get install -y \
+    apt-get install -y --no-install-recommends \
+      apt-utils \
       libreoffice \
+      unoconv \
       pandoc \
+      texlive-xetex \
+      texlive-fonts-recommended \
+      texlive-plain-generic \
       fonts-dejavu \
       fonts-liberation \
-      fonts-noto \
       xfonts-base \
       xfonts-75dpi \
       xfonts-scalable \
@@ -26,8 +29,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Expose port (use Render's $PORT in CMD)
+# Expose API port
 EXPOSE 10000
 
-# Start FastAPI using uvicorn with dynamic port
-CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT}"]
+# Start the FastAPI server
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "10000"]
