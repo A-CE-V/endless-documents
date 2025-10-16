@@ -2,22 +2,22 @@ import os
 import tempfile
 import urllib.request
 import subprocess
+import pathlib
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.requests import Request
 
-
 app = FastAPI()
 
-# Output formats we support with Pandoc
+# Pandoc-supported output formats
 PANDOC_FORMATS = [
     "pdf", "docx", "odt", "rtf", "md", "html", "txt",
     "tex", "epub", "asciidoc", "mediawiki"
 ]
 
-# Map common file extensions to Pandoc input formats
+# Map file extensions to Pandoc input formats
 EXT_TO_PANDOC = {
-    "txt": "markdown",         # ← was "plain", now fixed
+    "txt": "markdown",   # treat txt as markdown-like
     "md": "markdown",
     "markdown": "markdown",
     "html": "html",
@@ -26,7 +26,7 @@ EXT_TO_PANDOC = {
     "odt": "odt",
     "rtf": "rtf",
     "tex": "latex",
-    "csv": "markdown",         # CSV might be handled as a table in markdown
+    "csv": "markdown",
     "epub": "epub",
     "asciidoc": "asciidoc",
     "mediawiki": "mediawiki"
@@ -62,7 +62,7 @@ def formats():
         "notes": [
             "Pandoc is used exclusively for conversion.",
             "Input files must be UTF-8 text for text-based formats.",
-            "PDF output may require LaTeX (already in Render image)."
+            "PDF output requires LaTeX (already installed in Docker)."
         ]
     }
 
@@ -84,7 +84,6 @@ async def convert_file(
             detail=f"Unsupported output format '{out_ext}'. Supported: {', '.join(PANDOC_FORMATS)}"
         )
 
-    # Save input file to temp
     tmp_input = tempfile.NamedTemporaryFile(delete=False)
     try:
         if file:
@@ -96,26 +95,25 @@ async def convert_file(
             urllib.request.urlretrieve(url, tmp_input.name)
             input_name = os.path.basename(url)
 
-        # Detect input format based on extension
-        input_ext = os.path.splitext(input_name)[1].lower().strip(".")
-        pandoc_from = EXT_TO_PANDOC.get(input_ext, "plain")
+        # 🔸 Detect input format using pathlib
+        ext_in = pathlib.Path(input_name).suffix.lower().strip(".")
+        pandoc_from = EXT_TO_PANDOC.get(ext_in, "markdown")  # fallback to markdown
 
-        # Attempt to re-encode text files to UTF-8 (to avoid decoding errors)
+        # Attempt to re-encode text files to UTF-8
         if pandoc_from in ["plain", "markdown", "html", "latex", "asciidoc", "mediawiki", "csv"]:
             try:
                 with open(tmp_input.name, "rb") as f:
                     raw = f.read()
-                # Try common Windows encoding
                 text = raw.decode("utf-8", errors="replace")
                 with open(tmp_input.name, "w", encoding="utf-8") as f:
                     f.write(text)
             except Exception:
-                pass  # Fail silently if not text-based
+                pass
 
         # Prepare output file
         output_path = tempfile.NamedTemporaryFile(delete=False, suffix=f".{out_ext}").name
 
-        # Run Pandoc
+        # 🔸 Run Pandoc with detected input format
         try:
             subprocess.run(
                 ["pandoc", "-f", pandoc_from, tmp_input.name, "-o", output_path],
@@ -124,7 +122,7 @@ async def convert_file(
         except subprocess.CalledProcessError as e:
             raise HTTPException(status_code=500, detail=f"Pandoc conversion failed: {e}")
 
-        # Serve file
+        # Return converted file
         filename = os.path.splitext(input_name)[0]
         final_name = f"{filename}.{out_ext}"
         return FileResponse(
