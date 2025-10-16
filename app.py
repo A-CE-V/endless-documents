@@ -1,12 +1,13 @@
 import os
 import tempfile
 import urllib.request
-import pypandoc
+import subprocess
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.responses import FileResponse
 
 app = FastAPI()
 
+# Pandoc-supported output formats
 PANDOC_FORMATS = [
     "pdf", "docx", "odt", "rtf", "md", "html", "txt",
     "tex", "epub", "asciidoc", "mediawiki"
@@ -21,6 +22,7 @@ def home():
         "uptime": os.times()
     }
 
+
 @app.get("/health")
 def health():
     return {
@@ -28,9 +30,10 @@ def health():
         "uptime": os.times(),
         "supported": {
             "pandoc": True,
-            "libreoffice": True  # Still installed but fallback is skipped
+            "libreoffice": True
         }
     }
+
 
 @app.get("/formats")
 def formats():
@@ -39,16 +42,14 @@ def formats():
             "docx", "doc", "odt", "rtf", "txt", "md", "html", "epub",
             "pptx", "xlsx", "csv", "tex", "asciidoc", "mediawiki"
         ],
-        "outputs": [
-            "pdf", "docx", "odt", "rtf", "md", "html", "txt",
-            "pptx", "xlsx", "csv", "tex", "epub", "asciidoc", "mediawiki"
-        ],
+        "outputs": PANDOC_FORMATS,
         "notes": [
             "Pandoc is used exclusively for conversion.",
             "LibreOffice is installed but fallback is disabled.",
             "PDF output may require LaTeX for some formats."
         ]
     }
+
 
 @app.post("/convert")
 async def convert_file(
@@ -82,10 +83,13 @@ async def convert_file(
         # Prepare output path
         output_path = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}").name
 
-        # Pandoc-only conversion
+        # Convert using Pandoc via subprocess
         try:
-            pypandoc.convert_file(tmp_input.name, to=ext, outputfile=output_path)
-        except Exception as e:
+            subprocess.run(
+                ["pandoc", tmp_input.name, "-o", output_path],
+                check=True
+            )
+        except subprocess.CalledProcessError as e:
             raise HTTPException(status_code=500, detail=f"Pandoc conversion failed: {e}")
 
         filename = os.path.splitext(input_name)[0]
