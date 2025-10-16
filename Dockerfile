@@ -1,6 +1,6 @@
-FROM python:3.11-slim
+FROM python:3.11-bullseye
 
-# Install LibreOffice + dependencies in separate steps to avoid partial apt issues
+# Install LibreOffice + dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends apt-utils && \
     apt-get install -y \
