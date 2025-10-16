@@ -1,7 +1,6 @@
 import os
 import tempfile
 import urllib.request
-import subprocess
 import pypandoc
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.responses import FileResponse
@@ -24,10 +23,9 @@ def health():
         "uptime": os.times(),
         "supported": {
             "pandoc": True,
-            "libreoffice": True
+            "libreoffice": True  # Still installed but fallback is skipped
         }
     }
-
 
 @app.get("/formats")
 def formats():
@@ -41,11 +39,11 @@ def formats():
             "pptx", "xlsx", "csv", "tex", "epub", "asciidoc", "mediawiki"
         ],
         "notes": [
-            "Pandoc is used by default, LibreOffice is used as fallback.",
+            "Pandoc is used exclusively for conversion.",
+            "LibreOffice is installed but fallback is disabled.",
             "PDF output may require LaTeX for some formats."
         ]
     }
-
 
 @app.post("/convert")
 async def convert_file(
@@ -74,15 +72,11 @@ async def convert_file(
     ext = format.lower().strip(".")
     output_path = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}").name
 
-    # Try Pandoc first
+    # Pandoc-only conversion
     try:
         pypandoc.convert_file(tmp_input.name, to=ext, outputfile=output_path)
-    except Exception:
-        # Fallback to LibreOffice / unoconv if Pandoc fails
-        try:
-            subprocess.run(["unoconv", "-f", ext, "-o", output_path, tmp_input.name], check=True)
-        except subprocess.CalledProcessError as e:
-            raise HTTPException(status_code=500, detail=f"Conversion failed: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Pandoc conversion failed: {e}")
 
     filename = os.path.splitext(input_name)[0]
     final_name = f"{filename}.{ext}"
