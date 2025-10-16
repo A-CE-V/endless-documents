@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     texlive-latex-base \
     texlive-latex-extra \
     texlive-plain-generic \
+    fonts-lmodern \
     fonts-dejavu \
     fonts-liberation \
     fonts-freefont-ttf \
